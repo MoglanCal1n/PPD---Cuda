@@ -12,6 +12,9 @@ const string INPUT_FILE = "date.txt";
 const string OUTPUT_FILE = "output.txt";
 
 const int K = 3;
+const int RADIUS = K / 2;
+
+__constant__ int d_C_const[K * K];
 
 #define cudaCheckError(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true) {
@@ -21,47 +24,48 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
    }
 }
 
-__global__ void computeRowConvolution(int* F, const int* C, const int* prevRow, const int* currRow, int rowIdx, int M, int N) {
+__global__ void computeRowConvolution(int* F, const int* prevRow, const int* currRow, int rowIdx, int M, int N) {
     int col = blockIdx.x * blockDim.x + threadIdx.x;
 
     if (col < N) {
         int sum = 0;
-        int half_k = K / 2; 
 
-        for (int u = -half_k; u <= half_k; u++) {     
-            for (int v = -half_k; v <= half_k; v++) { 
-                
-                int valPixel;
+        for (int u = -RADIUS; u <= RADIUS; u++) {
+            for (int v = -RADIUS; v <= RADIUS; v++) {
+
                 int n_col = col + v;
-
                 if (n_col < 0) n_col = 0;
                 if (n_col >= N) n_col = N - 1;
 
-                
-                if (u == -1) { 
-                    if (rowIdx == 0) valPixel = currRow[n_col];
-                    else valPixel = prevRow[n_col];
-                } 
-                else if (u == 0) { 
+                int valPixel = 0;
+
+
+                if (u == -1) {
+                    valPixel = prevRow[n_col];
+                }
+                else if (u == 0) {
                     valPixel = currRow[n_col];
-                } 
-                else { 
-                    if (rowIdx == M - 1) valPixel = currRow[n_col];
-                    else valPixel = F[(rowIdx + 1) * N + n_col];
+                }
+                else {
+                    if (rowIdx == M - 1) {
+                        valPixel = currRow[n_col];
+                    } else {
+                        valPixel = F[(rowIdx + 1) * N + n_col];
+                    }
                 }
 
-                sum += valPixel * C[(u + 1) * K + (v + 1)];
+                sum += valPixel * d_C_const[(u + RADIUS) * K + (v + RADIUS)];
             }
         }
-        
+
         F[rowIdx * N + col] = sum;
     }
 }
 
 void readInput(int* &h_F, int* &h_C, int M, int N) {
     ifstream fin(INPUT_FILE);
-    if (!fin) { 
-        cerr << "Eroare: Nu pot deschide " << INPUT_FILE << endl; exit(1); 
+    if (!fin) {
+        cerr << "Error: Cannot open " << INPUT_FILE << ". Please generate it first." << endl; exit(1);
     }
     h_F = new int[M * N];
     h_C = new int[K * K];
@@ -82,57 +86,65 @@ void writeOutput(const int* h_F, int M, int N) {
 }
 
 int main(int argc, char* argv[]) {
-    if (argc < 3) { cout << "Usage: ./program <M> <N>" << endl; return 1; }
-    int M = stoi(argv[1]);
-    int N = stoi(argv[2]);
+    int M = 10;
+    int N = 10;
+
+    if (argc == 3) {
+        M = stoi(argv[1]);
+        N = stoi(argv[2]);
+    } else {
+        cout << "Running with default 10x10. Usage: ./program <M> <N>" << endl;
+    }
 
     int *h_F = nullptr, *h_C = nullptr;
     readInput(h_F, h_C, M, N);
 
-    int *d_F, *d_C;
+    int *d_F;
     int *d_prevRow, *d_currRow;
 
     size_t sizeImage = M * N * sizeof(int);
-    
+    size_t sizeRow = N * sizeof(int);
+
     cudaCheckError(cudaMalloc(&d_F, sizeImage));
-    cudaCheckError(cudaMalloc(&d_C, K * K * sizeof(int)));
-    cudaCheckError(cudaMalloc(&d_prevRow, N * sizeof(int)));
-    cudaCheckError(cudaMalloc(&d_currRow, N * sizeof(int)));
+    cudaCheckError(cudaMalloc(&d_prevRow, sizeRow));
+    cudaCheckError(cudaMalloc(&d_currRow, sizeRow));
 
     cudaCheckError(cudaMemcpy(d_F, h_F, sizeImage, cudaMemcpyHostToDevice));
-    cudaCheckError(cudaMemcpy(d_C, h_C, K * K * sizeof(int), cudaMemcpyHostToDevice));
+    cudaCheckError(cudaMemcpyToSymbol(d_C_const, h_C, K * K * sizeof(int)));
 
-    cudaCheckError(cudaMemcpy(d_prevRow, d_F, N * sizeof(int), cudaMemcpyDeviceToDevice)); 
-    cudaCheckError(cudaMemcpy(d_currRow, d_F, N * sizeof(int), cudaMemcpyDeviceToDevice));
+    cudaCheckError(cudaMemcpy(d_prevRow, d_F, sizeRow, cudaMemcpyDeviceToDevice));
+    cudaCheckError(cudaMemcpy(d_currRow, d_F, sizeRow, cudaMemcpyDeviceToDevice));
 
     int threadsPerBlock = 256;
     int blocksPerGrid = (N + threadsPerBlock - 1) / threadsPerBlock;
 
+    cout << "Starting convolution on " << M << "x" << N << " matrix..." << endl;
     auto start = chrono::high_resolution_clock::now();
 
     for (int i = 0; i < M; i++) {
-        
-        computeRowConvolution<<<blocksPerGrid, threadsPerBlock>>>(d_F, d_C, d_prevRow, d_currRow, i, M, N);
-        cudaCheckError(cudaGetLastError()); // Verificare erori lansare
+
+        computeRowConvolution<<<blocksPerGrid, threadsPerBlock>>>(d_F, d_prevRow, d_currRow, i, M, N);
+        cudaCheckError(cudaGetLastError());
 
         if (i < M - 1) {
-            cudaCheckError(cudaMemcpy(d_prevRow, d_currRow, N * sizeof(int), cudaMemcpyDeviceToDevice));
-            
-            cudaCheckError(cudaMemcpy(d_currRow, d_F + (i + 1) * N, N * sizeof(int), cudaMemcpyDeviceToDevice));
+            cudaCheckError(cudaMemcpy(d_prevRow, d_currRow, sizeRow, cudaMemcpyDeviceToDevice));
+
+            cudaCheckError(cudaMemcpy(d_currRow, d_F + (i + 1) * N, sizeRow, cudaMemcpyDeviceToDevice));
         }
     }
 
     cudaCheckError(cudaDeviceSynchronize());
+
     auto end = chrono::high_resolution_clock::now();
     double duration = chrono::duration<double, milli>(end - start).count();
-    cout << "Timp executie: " << duration << " ms" << endl;
+    cout << "Execution Time: " << duration << " ms" << endl;
 
     cudaCheckError(cudaMemcpy(h_F, d_F, sizeImage, cudaMemcpyDeviceToHost));
 
     writeOutput(h_F, M, N);
 
     delete[] h_F; delete[] h_C;
-    cudaFree(d_F); cudaFree(d_C); cudaFree(d_prevRow); cudaFree(d_currRow);
+    cudaFree(d_F); cudaFree(d_prevRow); cudaFree(d_currRow);
 
     return 0;
 }
