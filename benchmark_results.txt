@@ -1,11 +1,20 @@
-CUDA Benchmark Results - Fri 01/09/2026  1:00:01.05 
+CUDA Lab 2 Benchmark - Tue 01/13/26 18:49:21.24 
 -------------------------------------------------------- 
-[TEST] Matrix: 10x10 
-   Time: 0.23815 ms 
--------------------------------------------------------- 
-[TEST] Matrix: 1000x1000 
-   Time: 20.93783 ms 
--------------------------------------------------------- 
-[TEST] Matrix: 10000x10000 
-   Time: 237.8245 ms 
--------------------------------------------------------- 
+ 
+[CASE 1] Matrix: 10x10 
+     CPU Time: 0.0016 ms 
+     GPU Time (Block 64): 0.3123 ms 
+ 
+[CASE 2] Matrix: 1000x1000 
+     CPU Time: 9.3043 ms 
+     GPU Time (Block 64): 27.6259 ms 
+     GPU Time (Block 128): 26.8311 ms 
+     GPU Time (Block 256): 29.7167 ms 
+     GPU Time (Block 512): 28.5252 ms 
+ 
+[CASE 3] Matrix: 10000x10000 
+     CPU Time: 922.3883 ms 
+     GPU Time (Block 64): 285.5845 ms 
+     GPU Time (Block 128): 267.7944 ms 
+     GPU Time (Block 256): 293.6017 ms 
+     GPU Time (Block 512): 291.98 ms 

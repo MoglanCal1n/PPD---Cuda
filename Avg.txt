@@ -1,0 +1,20 @@
+     CPU Time: 0.0017 ms
+     GPU Time (Block 64): 0 ms
+     CPU Time: 8.8289 ms
+     CPU Time: 0.0015 ms
+     GPU Time (Block 64): 0.3183 ms
+     CPU Time: 8.8372 ms
+     GPU Time (Block 64): 26.8148 ms
+     GPU Time (Block 128): 29.1067 ms
+     CPU Time: 0.0016 ms
+     GPU Time (Block 64): 0.3123 ms
+     CPU Time: 9.3043 ms
+     GPU Time (Block 64): 27.6259 ms
+     GPU Time (Block 128): 26.8311 ms
+     GPU Time (Block 256): 29.7167 ms
+     GPU Time (Block 512): 28.5252 ms
+     CPU Time: 922.3883 ms
+     GPU Time (Block 64): 285.5845 ms
+     GPU Time (Block 128): 267.7944 ms
+     GPU Time (Block 256): 293.6017 ms
+     GPU Time (Block 512): 291.98 ms

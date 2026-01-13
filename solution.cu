@@ -88,12 +88,17 @@ void writeOutput(const int* h_F, int M, int N) {
 int main(int argc, char* argv[]) {
     int M = 10;
     int N = 10;
+    int threadsPerBlock = 256;
 
-    if (argc == 3) {
+    if (argc >= 4) {
+        M = stoi(argv[1]);
+        N = stoi(argv[2]);
+        threadsPerBlock = stoi(argv[3]);
+    } else if (argc == 3) {
         M = stoi(argv[1]);
         N = stoi(argv[2]);
     } else {
-        cout << "Running with default 10x10. Usage: ./program <M> <N>" << endl;
+        cout << "Running with default 10x10 and 256 threads per block. Usage: ./program <M> <N> <threadsPerBlock>" << endl;
     }
 
     int *h_F = nullptr, *h_C = nullptr;
@@ -115,7 +120,6 @@ int main(int argc, char* argv[]) {
     cudaCheckError(cudaMemcpy(d_prevRow, d_F, sizeRow, cudaMemcpyDeviceToDevice));
     cudaCheckError(cudaMemcpy(d_currRow, d_F, sizeRow, cudaMemcpyDeviceToDevice));
 
-    int threadsPerBlock = 256;
     int blocksPerGrid = (N + threadsPerBlock - 1) / threadsPerBlock;
 
     cout << "Starting convolution on " << M << "x" << N << " matrix..." << endl;
